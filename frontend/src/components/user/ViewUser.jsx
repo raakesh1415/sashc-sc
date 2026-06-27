@@ -120,7 +120,8 @@ const ViewUser = () => {
           status: data.is_active ? "Aktif" : "Tidak Aktif",
           is_principal: data.teacherID?.is_principal ?? false,
         });
-      } catch (err) {
+      } catch {
+        // ignore — load failure leaves the form in its default state
       } finally {
         setLoading(false);
       }

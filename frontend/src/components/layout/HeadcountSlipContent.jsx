@@ -13,6 +13,7 @@ import { Box, Typography, Divider, Chip } from "@mui/material";
 import sasLogoImage from "../../assets/images/sas-logo.png";
 
 // ── Grade → chip colour ───────────────────────────────────────────────────────
+// eslint-disable-next-line react-refresh/only-export-components
 export const gradeColor = (grade) => {
   if (!grade) return "default";
   if (grade === "TH") return "default";

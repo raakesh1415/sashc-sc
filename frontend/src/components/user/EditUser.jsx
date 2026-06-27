@@ -510,7 +510,7 @@ const EditUser = () => {
                             </TableHead>
                             <TableBody>
                               {subjectsList.map((subj) => {
-                                const isSubjectSelected = subjectClassMap.hasOwnProperty(subj.subjectID);
+                                const isSubjectSelected = Object.prototype.hasOwnProperty.call(subjectClassMap, subj.subjectID);
                                 const selectedClasses = subjectClassMap[subj.subjectID] || [];
 
                                 return (

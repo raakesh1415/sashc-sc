@@ -94,7 +94,7 @@ const ConfirmResetPassword = () => {
       return;
     }
 
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword)) {
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword)) {
       setError("Kata laluan mestilah mengandungi sekurang-kurangnya satu aksara khas (!@#$%^&*)");
       setMsgKey(k => k + 1);
       return;
