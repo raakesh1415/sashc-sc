@@ -11,9 +11,6 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "raakesh1415/sashc-app"
-        // Baked into the Vite frontend bundle at image-build time. Not a secret
-        // (it ships in the browser JS). Set this to your real backend URL.
-        VITE_BACKEND_BASE_URL = "http://localhost:8000"
     }
 
     options {
@@ -26,11 +23,19 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-                // Materialise the .env from the Jenkins "Secret file" credential
-                // into the workspace so the container stages (reuseNode true)
-                // and python-decouple can read backend/.env. Never committed to git.
-                withCredentials([file(credentialsId: 'sashc-env', variable: 'ENV_FILE')]) {
-                    sh 'cp "$ENV_FILE" backend/.env'
+                // Materialise the .env files from Jenkins "Secret file" credentials
+                // into the workspace. The container stages (reuseNode true) and the
+                // Docker build context then see them; they're never committed to git.
+                //   backend/.env  -> read at runtime by python-decouple
+                //   frontend/.env -> auto-loaded by Vite at build time (VITE_* vars)
+                withCredentials([
+                    file(credentialsId: 'backend-env',  variable: 'BACKEND_ENV'),
+                    file(credentialsId: 'frontend-env', variable: 'FRONTEND_ENV')
+                ]) {
+                    sh '''
+                        cp "$BACKEND_ENV"  backend/.env
+                        cp "$FRONTEND_ENV" frontend/.env
+                    '''
                 }
                 script {
                     // Short commit SHA used to tag the Docker image (Task A7)
@@ -99,7 +104,8 @@ pipeline {
                     docker.image('node:20-alpine').inside('-e HOME=/tmp') {
                         sh '''
                             cd frontend
-                            npx eslint src/ --ext .js,.jsx
+                            npm install
+                            npx eslint src
                         '''
                     }
                 }
@@ -160,7 +166,6 @@ pipeline {
                 echo 'Building Docker image (tagged latest + commit SHA)...'
                 sh '''
                     docker build \
-                      --build-arg VITE_BACKEND_BASE_URL=${VITE_BACKEND_BASE_URL} \
                       -t ${DOCKER_IMAGE}:latest \
                       -t ${DOCKER_IMAGE}:${GIT_SHA} .
                 '''
