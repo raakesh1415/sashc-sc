@@ -408,7 +408,4 @@ class Feedback(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.name} - {self.title}"
-
-    def __str__(self):
         return f"Reset token for {self.user.email} - Valid: {self.is_valid()}"

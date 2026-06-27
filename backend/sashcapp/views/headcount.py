@@ -9,7 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from ..models import Headcount, Subject, User
+from ..models import Headcount, Subject
 from ..serializers import HeadcountRowSerializer
 from .utils import _grade, get_active_year
 
