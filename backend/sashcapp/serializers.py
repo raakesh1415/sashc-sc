@@ -535,7 +535,6 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
         # ── Detect role changes ────────────────────────────────────────────────
         removed_roles = old_roles - new_roles
-        added_roles = new_roles - old_roles
 
         # ── Clean up profiles for removed roles ────────────────────────────────
         

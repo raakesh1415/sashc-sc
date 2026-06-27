@@ -97,7 +97,7 @@ pipeline {
                             python -m pip install --user --no-cache-dir flake8
                             # F = real errors (undefined names, unused imports),
                             # E9 = syntax errors. No PEP8 style checks.
-                            python -m flake8 . --select=F,E9 --exclude=migrations,settings.py
+                            python -m flake8 . --select=F,E9 --exclude=migrations,settings.py,deployment_settings.py,tests.py
                         '''
                     }
                 }

@@ -12,7 +12,7 @@ from ..serializers import (
     SelfAnalysisSubjectRowSerializer,
     StudentAnalysisRowSerializer,
 )
-from .utils import get_active_year, VALID_EXAMS, GRADE_KEYS, GP_WEIGHTS, calc_gp, empty_grade_counts, lulus_status
+from .utils import get_active_year, VALID_EXAMS, GRADE_KEYS, calc_gp, empty_grade_counts, lulus_status
 
 
 # ─────────────────────────────────────────
