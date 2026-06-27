@@ -23,6 +23,12 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+                // Materialise the .env from the Jenkins "Secret file" credential
+                // into the workspace so the container stages (reuseNode true)
+                // and python-decouple can read backend/.env. Never committed to git.
+                withCredentials([file(credentialsId: 'sashc-env', variable: 'ENV_FILE')]) {
+                    sh 'cp "$ENV_FILE" backend/.env'
+                }
                 script {
                     // Short commit SHA used to tag the Docker image (Task A7)
                     env.GIT_SHA = sh(
