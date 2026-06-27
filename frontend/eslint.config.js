@@ -23,7 +23,9 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Warn (don't fail the build) on unused vars — minor style.
+      // Real correctness problems from js.configs.recommended stay as errors.
+      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
 ])

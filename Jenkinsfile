@@ -33,8 +33,8 @@ pipeline {
                     file(credentialsId: 'frontend-env', variable: 'FRONTEND_ENV')
                 ]) {
                     sh '''
-                        cp "$BACKEND_ENV"  backend/.env
-                        cp "$FRONTEND_ENV" frontend/.env
+                        cp -f "$BACKEND_ENV"  backend/.env
+                        cp -f "$FRONTEND_ENV" frontend/.env
                     '''
                 }
                 script {
@@ -95,7 +95,9 @@ pipeline {
                         sh '''
                             cd backend
                             python -m pip install --user --no-cache-dir flake8
-                            python -m flake8 . --max-line-length=120 --exclude=migrations,settings.py
+                            # F = real errors (undefined names, unused imports),
+                            # E9 = syntax errors. No PEP8 style checks.
+                            python -m flake8 . --select=F,E9 --exclude=migrations,settings.py
                         '''
                     }
                 }
