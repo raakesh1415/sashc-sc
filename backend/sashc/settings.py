@@ -233,6 +233,10 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=f'SASHC <{EMAIL_HOST_U
 FRONTEND_URL = config('FRONTEND_URL', default='')
 
 # Logging configuration
+# Ensure the log directory exists so RotatingFileHandler can open the file
+# (the logs/ dir isn't committed to git).
+os.makedirs(os.path.join(BASE_DIR, 'logs'), exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
