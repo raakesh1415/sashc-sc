@@ -33,8 +33,8 @@ pipeline {
                     file(credentialsId: 'frontend-env', variable: 'FRONTEND_ENV')
                 ]) {
                     sh '''
-                        cp "$BACKEND_ENV"  backend/.env
-                        cp "$FRONTEND_ENV" frontend/.env
+                        cp -f "$BACKEND_ENV"  backend/.env
+                        cp -f "$FRONTEND_ENV" frontend/.env
                     '''
                 }
                 script {
