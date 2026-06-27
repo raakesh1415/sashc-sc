@@ -9,12 +9,16 @@
 FROM node:20-alpine AS frontend
 WORKDIR /frontend
 
+# Vite bakes VITE_* vars into the bundle at BUILD time, so the backend URL
+# must be supplied here via: docker build --build-arg VITE_BACKEND_BASE_URL=...
+ARG VITE_BACKEND_BASE_URL
+ENV VITE_BACKEND_BASE_URL=$VITE_BACKEND_BASE_URL
+
 COPY frontend/package*.json ./
 RUN npm install
 
 COPY frontend/ ./
-# Create React App outputs to /frontend/build.
-# If you use Vite instead, the output is /frontend/dist.
+# This project uses Vite, which outputs to /frontend/dist.
 RUN npm run build
 
 # ---- Stage 2: Django backend ----
@@ -42,8 +46,8 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn whitenoise
 COPY backend/ ./
 
 # Bring the compiled React app in so collectstatic / WhiteNoise serve it.
-# Change "build" to "dist" if you use Vite.
-COPY --from=frontend /frontend/build ./frontend_build
+# Vite outputs to dist/.
+COPY --from=frontend /frontend/dist ./frontend_build
 
 # Application port (Task A7). Gunicorn binds to 8000 below.
 EXPOSE 8000
