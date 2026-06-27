@@ -34,14 +34,31 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Build Backend') {
+            agent {
+                docker {
+                    image 'python:3.12-slim'
+                    reuseNode true
+                }
+            }
             steps {
                 echo 'Building Django backend...'
                 sh '''
                     cd backend
-                    pip install -r requirements.txt --break-system-packages
+                    python -m pip install --no-cache-dir -r requirements.txt
                     python manage.py collectstatic --noinput
                 '''
+            }
+        }
+
+        stage('Build Frontend') {
+            agent {
+                docker {
+                    image 'node:20-alpine'
+                    reuseNode true
+                }
+            }
+            steps {
                 echo 'Building React frontend...'
                 sh '''
                     cd frontend
@@ -54,24 +71,39 @@ pipeline {
         stage('Lint') {
             steps {
                 echo 'Running Django (flake8) linting...'
-                sh '''
-                    cd backend
-                    pip install flake8 --break-system-packages
-                    flake8 . --max-line-length=120 --exclude=migrations,settings.py
-                '''
+                script {
+                    docker.image('python:3.12-slim').inside {
+                        sh '''
+                            cd backend
+                            python -m pip install --no-cache-dir flake8
+                            flake8 . --max-line-length=120 --exclude=migrations,settings.py
+                        '''
+                    }
+                }
                 echo 'Running React (ESLint) linting...'
-                sh '''
-                    cd frontend
-                    npx eslint src/ --ext .js,.jsx
-                '''
+                script {
+                    docker.image('node:20-alpine').inside {
+                        sh '''
+                            cd frontend
+                            npx eslint src/ --ext .js,.jsx
+                        '''
+                    }
+                }
             }
         }
 
         stage('Test') {
+            agent {
+                docker {
+                    image 'python:3.12-slim'
+                    reuseNode true
+                }
+            }
             steps {
                 echo 'Running Django unit tests (minimum 3 test cases)...'
                 sh '''
                     cd backend
+                    python -m pip install --no-cache-dir -r requirements.txt
                     python manage.py test --verbosity=2
                 '''
             }
