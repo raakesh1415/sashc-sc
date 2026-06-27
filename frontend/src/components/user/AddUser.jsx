@@ -115,7 +115,8 @@ const AddUser = () => {
         ]);
         setSubjectsList(subRes.data.data || []);
         setClassesList(classRes.data.data || []);
-      } catch (err) {
+      } catch {
+        // ignore — initial load failures fall through to empty lists
       } finally {
         setLoading(false);
       }
@@ -470,7 +471,7 @@ const AddUser = () => {
                             </TableHead>
                             <TableBody>
                               {subjectsList.map((subj) => {
-                                const isSubjectSelected = subjectClassMap.hasOwnProperty(subj.subjectID);
+                                const isSubjectSelected = Object.prototype.hasOwnProperty.call(subjectClassMap, subj.subjectID);
                                 const selectedClasses = subjectClassMap[subj.subjectID] || [];
 
                                 return (

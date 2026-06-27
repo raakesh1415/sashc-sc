@@ -2,6 +2,7 @@ import axios from "axios";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const STORAGE_KEYS = {
     ACCESS_TOKEN:  'accessToken',
     REFRESH_TOKEN: 'refreshToken',
