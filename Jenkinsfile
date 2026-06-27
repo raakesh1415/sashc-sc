@@ -11,6 +11,9 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "raakesh1415/sashc-app"
+        // Baked into the Vite frontend bundle at image-build time. Not a secret
+        // (it ships in the browser JS). Set this to your real backend URL.
+        VITE_BACKEND_BASE_URL = "http://localhost:8000"
     }
 
     options {
@@ -23,6 +26,12 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+                // Materialise the .env from the Jenkins "Secret file" credential
+                // into the workspace so the container stages (reuseNode true)
+                // and python-decouple can read backend/.env. Never committed to git.
+                withCredentials([file(credentialsId: 'sashc-env', variable: 'ENV_FILE')]) {
+                    sh 'cp "$ENV_FILE" backend/.env'
+                }
                 script {
                     // Short commit SHA used to tag the Docker image (Task A7)
                     env.GIT_SHA = sh(
@@ -151,6 +160,7 @@ pipeline {
                 echo 'Building Docker image (tagged latest + commit SHA)...'
                 sh '''
                     docker build \
+                      --build-arg VITE_BACKEND_BASE_URL=${VITE_BACKEND_BASE_URL} \
                       -t ${DOCKER_IMAGE}:latest \
                       -t ${DOCKER_IMAGE}:${GIT_SHA} .
                 '''
