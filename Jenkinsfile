@@ -38,6 +38,9 @@ pipeline {
             agent {
                 docker {
                     image 'python:3.12-slim'
+                    // HOME=/tmp gives the non-root container user a writable home
+                    // so pip's --user install has somewhere to go.
+                    args '-e HOME=/tmp'
                     reuseNode true
                 }
             }
@@ -45,7 +48,7 @@ pipeline {
                 echo 'Building Django backend...'
                 sh '''
                     cd backend
-                    python -m pip install --no-cache-dir -r requirements.txt
+                    python -m pip install --user --no-cache-dir -r requirements.txt
                     python manage.py collectstatic --noinput
                 '''
             }
@@ -55,6 +58,8 @@ pipeline {
             agent {
                 docker {
                     image 'node:20-alpine'
+                    // HOME=/tmp so npm can write its cache (~/.npm).
+                    args '-e HOME=/tmp'
                     reuseNode true
                 }
             }
@@ -72,17 +77,17 @@ pipeline {
             steps {
                 echo 'Running Django (flake8) linting...'
                 script {
-                    docker.image('python:3.12-slim').inside {
+                    docker.image('python:3.12-slim').inside('-e HOME=/tmp') {
                         sh '''
                             cd backend
-                            python -m pip install --no-cache-dir flake8
-                            flake8 . --max-line-length=120 --exclude=migrations,settings.py
+                            python -m pip install --user --no-cache-dir flake8
+                            python -m flake8 . --max-line-length=120 --exclude=migrations,settings.py
                         '''
                     }
                 }
                 echo 'Running React (ESLint) linting...'
                 script {
-                    docker.image('node:20-alpine').inside {
+                    docker.image('node:20-alpine').inside('-e HOME=/tmp') {
                         sh '''
                             cd frontend
                             npx eslint src/ --ext .js,.jsx
@@ -96,6 +101,7 @@ pipeline {
             agent {
                 docker {
                     image 'python:3.12-slim'
+                    args '-e HOME=/tmp'
                     reuseNode true
                 }
             }
@@ -103,7 +109,7 @@ pipeline {
                 echo 'Running Django unit tests (minimum 3 test cases)...'
                 sh '''
                     cd backend
-                    python -m pip install --no-cache-dir -r requirements.txt
+                    python -m pip install --user --no-cache-dir -r requirements.txt
                     python manage.py test --verbosity=2
                 '''
             }
