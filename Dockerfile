@@ -9,16 +9,13 @@
 FROM node:20-alpine AS frontend
 WORKDIR /frontend
 
-# Vite bakes VITE_* vars into the bundle at BUILD time, so the backend URL
-# must be supplied here via: docker build --build-arg VITE_BACKEND_BASE_URL=...
-ARG VITE_BACKEND_BASE_URL
-ENV VITE_BACKEND_BASE_URL=$VITE_BACKEND_BASE_URL
-
 COPY frontend/package*.json ./
 RUN npm install
 
+# COPY brings in frontend/.env (materialised from the Jenkins 'frontend-env'
+# secret at checkout). Vite auto-loads it and bakes the VITE_* vars into the
+# bundle at build time. This project uses Vite, which outputs to /frontend/dist.
 COPY frontend/ ./
-# This project uses Vite, which outputs to /frontend/dist.
 RUN npm run build
 
 # ---- Stage 2: Django backend ----
