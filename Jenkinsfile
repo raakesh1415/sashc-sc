@@ -127,7 +127,19 @@ pipeline {
                 sh '''
                     cd backend
                     python -m pip install --user --no-cache-dir -r requirements.txt
+<<<<<<< Updated upstream
                     python manage.py test sashcapp.tests --verbosity=2 --noinput
+=======
+<<<<<<< HEAD
+<<<<<<< Updated upstream
+                    python manage.py test sashcapp.tests --verbosity=2
+=======
+                    python manage.py test sashcapp.tests --keepdb
+>>>>>>> Stashed changes
+=======
+                    python manage.py test sashcapp.tests --verbosity=2 --noinput
+>>>>>>> d7b02d9ff5694bc2ae8d83be02e93218538882f4
+>>>>>>> Stashed changes
                 '''
             }
         }
