@@ -1,8 +1,7 @@
 import uuid
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from django.db.models import Q
 from rest_framework import status
 from rest_framework.test import APITestCase
 
