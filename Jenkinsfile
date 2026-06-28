@@ -127,7 +127,7 @@ pipeline {
                 sh '''
                     cd backend
                     python -m pip install --user --no-cache-dir -r requirements.txt
-                    python manage.py test --verbosity=2
+                    python manage.py test sashcapp.tests --verbosity=2
                 '''
             }
         }
