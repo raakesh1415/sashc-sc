@@ -138,6 +138,10 @@ pipeline {
         }
 
         stage('Performance Test (JMeter)') {
+            environment {
+                JMETER_VERSION = '5.6.3'
+                JMETER_HOME    = '/tmp/apache-jmeter-5.6.3'
+            }
             steps {
                 echo 'Running JMeter performance tests...'
                 // 'jmeter-test-creds' is a Jenkins Username/Password credential
@@ -148,8 +152,19 @@ pipeline {
                     passwordVariable: 'JMETER_PASS'
                 )]) {
                     sh '''
+                        # Download JMeter if not already cached on this agent
+                        if [ ! -f "${JMETER_HOME}/bin/jmeter" ]; then
+                            echo "[JMeter] Downloading Apache JMeter ${JMETER_VERSION}..."
+                            curl -sSL \
+                                "https://downloads.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz" \
+                                | tar xz -C /tmp/
+                            echo "[JMeter] Download complete."
+                        else
+                            echo "[JMeter] Using cached installation at ${JMETER_HOME}"
+                        fi
+
                         rm -rf tests/jmeter-report tests/results.jtl
-                        /opt/jmeter/bin/jmeter -n \
+                        "${JMETER_HOME}/bin/jmeter" -n \
                           -t tests/sashc_test_plan.jmx \
                           -l tests/results.jtl \
                           -e -o tests/jmeter-report \
