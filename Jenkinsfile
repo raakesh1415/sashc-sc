@@ -10,7 +10,12 @@ pipeline {
     // ─────────────────────────────────────────────────────────────────────
 
     environment {
-        DOCKER_IMAGE = "raakesh1415/sashc-app"
+        DOCKER_IMAGE  = "raakesh1415/sashc-app"
+        // Target host/port for JMeter performance tests (Task A6).
+        // Point these at a running staging/dev server before the pipeline runs.
+        JMETER_HOST   = 'localhost'
+        JMETER_PORT   = '8000'
+        JMETER_YEAR   = '2026'
     }
 
     options {
@@ -135,13 +140,26 @@ pipeline {
         stage('Performance Test (JMeter)') {
             steps {
                 echo 'Running JMeter performance tests...'
-                sh '''
-                    rm -rf tests/jmeter-report tests/results.jtl
-                    /opt/jmeter/bin/jmeter -n \
-                      -t tests/sashc_test_plan.jmx \
-                      -l tests/results.jtl \
-                      -e -o tests/jmeter-report
-                '''
+                // 'jmeter-test-creds' is a Jenkins Username/Password credential
+                // where Username = test-user email, Password = test-user password.
+                withCredentials([usernamePassword(
+                    credentialsId: 'jmeter-test-creds',
+                    usernameVariable: 'JMETER_EMAIL',
+                    passwordVariable: 'JMETER_PASS'
+                )]) {
+                    sh '''
+                        rm -rf tests/jmeter-report tests/results.jtl
+                        /opt/jmeter/bin/jmeter -n \
+                          -t tests/sashc_test_plan.jmx \
+                          -l tests/results.jtl \
+                          -e -o tests/jmeter-report \
+                          -Jhost=${JMETER_HOST} \
+                          -Jport=${JMETER_PORT} \
+                          -Jemail="${JMETER_EMAIL}" \
+                          -Jpassword="${JMETER_PASS}" \
+                          -Jyear=${JMETER_YEAR}
+                    '''
+                }
             }
             post {
                 always {
