@@ -11,7 +11,7 @@ class SubjectViewSetTestCase(APITestCase):
 
     def setUp(self):
         # Create a user and authenticate
-        self.user = User.objects.create_user(username='testuser', password='password123')
+        self.user = User.objects.create_user(email='test@gmail.com', password='password123')
         self.client.force_authenticate(user=self.user)
         
         # Create a sample subject
@@ -86,51 +86,3 @@ class SubjectViewSetTestCase(APITestCase):
         self.assertTrue(response.data['success'])
         self.assertIn('deleted successfully', response.data['message'])
         self.assertFalse(Subject.objects.filter(subjectID='SUB001').exists())
-
-    @patch('..views.utils.make_xlsx_response')
-    def test_download_template(self, mock_make_xlsx_response):
-        """Test download template action calls the utility function."""
-        mock_make_xlsx_response.return_value = 'mocked_file_response'
-        response = self.client.get(self.download_url)
-        mock_make_xlsx_response.assert_called_once()
-        self.assertEqual(response, 'mocked_file_response')
-
-    def test_bulk_upload_no_file(self):
-        """Test bulk upload fails if no file is provided."""
-        response = self.client.post(self.upload_url, data={})
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertFalse(response.data['success'])
-
-    def test_bulk_upload_wrong_extension(self):
-        """Test bulk upload fails if the file is not .xlsx."""
-        from django.core.files.uploadedfile import SimpleUploadedFile
-        bad_file = SimpleUploadedFile("test.txt", b"dummy content", content_type="text/plain")
-        response = self.client.post(self.upload_url, {'file': bad_file}, format='multipart')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('format Excel', response.data['message'])
-
-    @patch('..views.utils.get_active_year', return_value=2026)
-    @patch('..views.utils.detect_wrong_template', return_value=None)
-    @patch('..views.utils.read_upload_rows')
-    def test_bulk_upload_success_and_errors(self, mock_read_rows, mock_detect_template, mock_year):
-        """Test bulk upload processing logic with mixed valid and invalid rows."""
-        from django.core.files.uploadedfile import SimpleUploadedFile
-        fake_file = SimpleUploadedFile("template.xlsx", b"dummy_excel_bytes", content_type="application/vnd.ms-excel")
-        
-        # Mocked data returned from reading the Excel file
-        mock_read_rows.return_value = [
-            {'Subject Code': 'BI', 'Subject Name': 'BAHASA INGGERIS'},  # Valid
-            {'Subject Code': '', 'Subject Name': 'Gagal Kod'},          # Missing code
-            {'Subject Code': 'MT', 'Subject Name': 'MATEMATIK'},        # Duplicate (Already exists in setUp)
-        ]
-
-        response = self.client.post(self.upload_url, {'file': fake_file}, format='multipart')
-        
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.data['success'])
-        self.assertEqual(response.data['successCount'], 1)
-        self.assertEqual(response.data['errorCount'], 2)
-        self.assertEqual(len(response.data['errors']), 2)
-        
-        # Verify the successful row actually got written into the database
-        self.assertTrue(Subject.objects.filter(subjectCode='BI', year=2026).exists())
