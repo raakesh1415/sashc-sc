@@ -138,11 +138,11 @@ pipeline {
         }
 
         stage('Performance Test (JMeter)') {
-          environment {
+            environment {
                 JMETER_VERSION = '5.6.3'
                 JMETER_HOME    = '/tmp/apache-jmeter-5.6.3'
             }
-          steps {
+            steps {
                 echo 'Running JMeter performance tests...'
                 // 'jmeter-test-creds' is a Jenkins Username/Password credential
                 // where Username = test-user email, Password = test-user password.
@@ -155,28 +155,28 @@ pipeline {
                         # 1. Clear old reports
                         rm -rf tests/jmeter-report tests/results.jtl
 
-                        # 2. Download Plugins Manager & CmdRunner if not already present
-                        if [ ! -f /opt/jmeter/lib/ext/jmeter-plugins-manager.jar ]; then
+                        # 2. Download Plugins Manager & CmdRunner if not already present in /tmp
+                        if [ ! -f "${JMETER_HOME}/lib/ext/jmeter-plugins-manager.jar" ]; then
                             echo "Installing JMeter Plugins Manager..."
-                            curl -sSL https://repo1.maven.org/maven2/kg/apc/jmeter-plugins-manager/1.9/jmeter-plugins-manager-1.9.jar -o /opt/jmeter/lib/ext/jmeter-plugins-manager.jar
-                            curl -sSL https://repo1.maven.org/maven2/kg/apc/cmdrunner/2.3/cmdrunner-2.3.jar -o /opt/jmeter/lib/cmdrunner-2.3.jar
-                            java -cp /opt/jmeter/lib/ext/jmeter-plugins-manager.jar org.jmeterplugins.repository.PluginManagerCMDInstaller
+                            curl -sSL https://repo1.maven.org/maven2/kg/apc/jmeter-plugins-manager/1.9/jmeter-plugins-manager-1.9.jar -o "${JMETER_HOME}/lib/ext/jmeter-plugins-manager.jar"
+                            curl -sSL https://repo1.maven.org/maven2/kg/apc/cmdrunner/2.3/cmdrunner-2.3.jar -o "${JMETER_HOME}/lib/cmdrunner-2.3.jar"
+                            java -cp "${JMETER_HOME}/lib/ext/jmeter-plugins-manager.jar" org.jmeterplugins.repository.PluginManagerCMDInstaller
                         fi
 
                         # 3. Install the specific plugin required for JSONPathExtractor
                         echo "Ensuring jpgc-json plugin is installed..."
-                        /opt/jmeter/bin/PluginsManagerCMD.sh install jpgc-json
+                        "${JMETER_HOME}/bin/PluginsManagerCMD.sh" install jpgc-json
 
-                        # 4. Run the JMeter tests
-                        /opt/jmeter/bin/jmeter -n \
-                          -t tests/sashc_test_plan.jmx \
-                          -l tests/results.jtl \
-                          -e -o tests/jmeter-report \
-                          -Jhost=${JMETER_HOST} \
-                          -Jport=${JMETER_PORT} \
-                          -Jemail="${JMETER_EMAIL}" \
-                          -Jpassword="${JMETER_PASS}" \
-                          -Jyear=${JMETER_YEAR}
+                        # 4. Run the JMeter tests using the dynamic home path
+                        "${JMETER_HOME}/bin/jmeter" -n \
+                        -t tests/sashc_test_plan.jmx \
+                        -l tests/results.jtl \
+                        -e -o tests/jmeter-report \
+                        -Jhost=${JMETER_HOST} \
+                        -Jport=${JMETER_PORT} \
+                        -Jemail="${JMETER_EMAIL}" \
+                        -Jpassword="${JMETER_PASS}" \
+                        -Jyear=${JMETER_YEAR}
                     '''
                 }
             }
