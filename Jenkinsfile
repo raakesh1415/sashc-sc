@@ -138,11 +138,11 @@ pipeline {
         }
 
         stage('Performance Test (JMeter)') {
-            environment {
+          environment {
                 JMETER_VERSION = '5.6.3'
                 JMETER_HOME    = '/tmp/apache-jmeter-5.6.3'
             }
-            steps {
+          steps {
                 echo 'Running JMeter performance tests...'
                 // 'jmeter-test-creds' is a Jenkins Username/Password credential
                 // where Username = test-user email, Password = test-user password.
@@ -179,7 +179,6 @@ pipeline {
                           -Jyear=${JMETER_YEAR}
                     '''
                 }
-            }
             }
             post {
                 always {
