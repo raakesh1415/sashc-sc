@@ -152,19 +152,23 @@ pipeline {
                     passwordVariable: 'JMETER_PASS'
                 )]) {
                     sh '''
-                        # Download JMeter if not already cached on this agent
-                        if [ ! -f "${JMETER_HOME}/bin/jmeter" ]; then
-                            echo "[JMeter] Downloading Apache JMeter ${JMETER_VERSION}..."
-                            curl -sSL \
-                                "https://downloads.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz" \
-                                | tar xz -C /tmp/
-                            echo "[JMeter] Download complete."
-                        else
-                            echo "[JMeter] Using cached installation at ${JMETER_HOME}"
+                        # 1. Clear old reports
+                        rm -rf tests/jmeter-report tests/results.jtl
+
+                        # 2. Download Plugins Manager & CmdRunner if not already present
+                        if [ ! -f /opt/jmeter/lib/ext/jmeter-plugins-manager.jar ]; then
+                            echo "Installing JMeter Plugins Manager..."
+                            curl -sSL https://repo1.maven.org/maven2/kg/apc/jmeter-plugins-manager/1.9/jmeter-plugins-manager-1.9.jar -o /opt/jmeter/lib/ext/jmeter-plugins-manager.jar
+                            curl -sSL https://repo1.maven.org/maven2/kg/apc/cmdrunner/2.3/cmdrunner-2.3.jar -o /opt/jmeter/lib/cmdrunner-2.3.jar
+                            java -cp /opt/jmeter/lib/ext/jmeter-plugins-manager.jar org.jmeterplugins.repository.PluginManagerCMDInstaller
                         fi
 
-                        rm -rf tests/jmeter-report tests/results.jtl
-                        "${JMETER_HOME}/bin/jmeter" -n \
+                        # 3. Install the specific plugin required for JSONPathExtractor
+                        echo "Ensuring jpgc-json plugin is installed..."
+                        /opt/jmeter/bin/PluginsManagerCMD.sh install jpgc-json
+
+                        # 4. Run the JMeter tests
+                        /opt/jmeter/bin/jmeter -n \
                           -t tests/sashc_test_plan.jmx \
                           -l tests/results.jtl \
                           -e -o tests/jmeter-report \
@@ -175,6 +179,7 @@ pipeline {
                           -Jyear=${JMETER_YEAR}
                     '''
                 }
+            }
             }
             post {
                 always {
