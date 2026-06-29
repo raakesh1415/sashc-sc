@@ -2,13 +2,6 @@
 <jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
   <hashTree>
 
-    <!-- ══════════════════════════════════════════════════════════════
-         SASHC School Assessment Hub – JMeter Performance Test Plan
-         Targets: POST /api/token/  and  GET /api/subjects/
-         Config : pass -Jhost / -Jport / -Jemail / -Jpassword / -Jyear
-                  on the CLI (Jenkins injects these via withCredentials)
-         ══════════════════════════════════════════════════════════════ -->
-
     <TestPlan guiclass="TestPlanGui" testclass="TestPlan"
               testname="SASHC Performance Test Plan" enabled="true">
       <stringProp name="TestPlan.comments">50 virtual users · 10 s ramp-up · 5 loops</stringProp>
@@ -19,35 +12,30 @@
                    testname="User Defined Variables" enabled="true">
         <collectionProp name="Arguments.arguments">
 
-          <!-- Override at CLI with -Jhost=<value> -->
           <elementProp name="HOST" elementType="Argument">
             <stringProp name="Argument.name">HOST</stringProp>
             <stringProp name="Argument.value">${__P(host,localhost)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
 
-          <!-- Override at CLI with -Jport=<value> -->
           <elementProp name="PORT" elementType="Argument">
             <stringProp name="Argument.name">PORT</stringProp>
             <stringProp name="Argument.value">${__P(port,8000)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
 
-          <!-- Override at CLI with -Jemail=<value> (Jenkins injects from credential) -->
           <elementProp name="LOGIN_EMAIL" elementType="Argument">
             <stringProp name="Argument.name">LOGIN_EMAIL</stringProp>
             <stringProp name="Argument.value">${__P(email,admin@example.com)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
 
-          <!-- Override at CLI with -Jpassword=<value> (Jenkins injects from credential) -->
           <elementProp name="LOGIN_PASSWORD" elementType="Argument">
             <stringProp name="Argument.name">LOGIN_PASSWORD</stringProp>
             <stringProp name="Argument.value">${__P(password,changeme)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
 
-          <!-- Academic year filter for /api/subjects/ -->
           <elementProp name="YEAR" elementType="Argument">
             <stringProp name="Argument.name">YEAR</stringProp>
             <stringProp name="Argument.value">${__P(year,2026)}</stringProp>
@@ -60,7 +48,6 @@
 
     <hashTree>
 
-      <!-- ── Thread Group: 50 users · 10 s ramp-up · 5 loops ───────────── -->
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup"
                    testname="SASHC Users – 50 threads" enabled="true">
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
@@ -79,7 +66,6 @@
 
       <hashTree>
 
-        <!-- ── HTTP Request Defaults (applies to all samplers) ─────────── -->
         <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement"
                            testname="HTTP Request Defaults" enabled="true">
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments"
@@ -97,7 +83,6 @@
         </ConfigTestElement>
         <hashTree/>
 
-        <!-- ── Global Header Manager (JSON content type for all requests) ── -->
         <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager"
                        testname="HTTP Headers – JSON" enabled="true">
           <collectionProp name="HeaderManager.headers">
@@ -113,11 +98,6 @@
         </HeaderManager>
         <hashTree/>
 
-        <!-- ═══════════════════════════════════════════════════════════════
-             SAMPLER 1 – POST /api/token/
-             Obtain a JWT access token.  The extracted token is stored in
-             the thread-local variable ${access_token} and used by Sampler 2.
-             ═══════════════════════════════════════════════════════════════ -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="POST /api/token/ – Obtain JWT" enabled="true">
           <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
@@ -139,7 +119,6 @@
         </HTTPSamplerProxy>
         <hashTree>
 
-          <!-- Response Assertion: HTTP 200 OK -->
           <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
                              testname="Assert Token 200 OK" enabled="true">
             <collectionProp name="Asserion.test_strings">
@@ -152,22 +131,17 @@
           </ResponseAssertion>
           <hashTree/>
 
-          <!-- JSON Extractor: capture the JWT access token -->
-          <JSONPathExtractor guiclass="JSONPathExtractorGui" testclass="JSONPathExtractor"
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor"
                              testname="Extract Access Token" enabled="true">
-            <stringProp name="JSONPathExtractor.referenceNames">access_token</stringProp>
-            <stringProp name="JSONPathExtractor.jsonPathExprs">$.access</stringProp>
-            <stringProp name="JSONPathExtractor.defaultValues">NO_TOKEN</stringProp>
-          </JSONPathExtractor>
+            <stringProp name="JSONPostProcessor.referenceNames">access_token</stringProp>
+            <stringProp name="JSONPostProcessor.jsonPathExprs">$.access</stringProp>
+            <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
+            <stringProp name="JSONPostProcessor.defaultValues">NO_TOKEN</stringProp>
+          </JSONPostProcessor>
           <hashTree/>
 
         </hashTree>
 
-        <!-- ═══════════════════════════════════════════════════════════════
-             SAMPLER 2 – GET /api/subjects/?year=<YEAR>
-             Authenticated data-retrieval endpoint.  Uses the JWT token
-             extracted in Sampler 1 via the per-sampler HeaderManager below.
-             ═══════════════════════════════════════════════════════════════ -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="GET /api/subjects/ – List Subjects" enabled="true">
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments"
@@ -190,7 +164,6 @@
         </HTTPSamplerProxy>
         <hashTree>
 
-          <!-- Per-request Authorization header using extracted token -->
           <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager"
                          testname="Authorization Header" enabled="true">
             <collectionProp name="HeaderManager.headers">
@@ -202,7 +175,6 @@
           </HeaderManager>
           <hashTree/>
 
-          <!-- Response Assertion: HTTP 200 OK -->
           <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
                              testname="Assert Subjects 200 OK" enabled="true">
             <collectionProp name="Asserion.test_strings">
@@ -217,15 +189,6 @@
 
         </hashTree>
 
-        <!-- ═══════════════════════════════════════════════════════════════
-             LISTENERS
-             In non-GUI / Jenkins mode the HTML dashboard is generated by
-             the -e -o flags on the CLI (from the .jtl results file).
-             These listeners are included so the plan is complete when
-             opened in the JMeter GUI for local inspection.
-             ═══════════════════════════════════════════════════════════════ -->
-
-        <!-- Summary Report -->
         <ResultCollector guiclass="SummaryReport" testclass="ResultCollector"
                          testname="Summary Report" enabled="true">
           <boolProp name="ResultCollector.error_logging">false</boolProp>
@@ -251,7 +214,6 @@
         </ResultCollector>
         <hashTree/>
 
-        <!-- View Results Tree -->
         <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector"
                          testname="View Results Tree" enabled="true">
           <boolProp name="ResultCollector.error_logging">false</boolProp>
@@ -277,7 +239,6 @@
         </ResultCollector>
         <hashTree/>
 
-        <!-- Response Time Graph -->
         <ResultCollector guiclass="RespTimeGraphVisualizer" testclass="ResultCollector"
                          testname="Response Time Graph" enabled="true">
           <boolProp name="ResultCollector.error_logging">false</boolProp>
