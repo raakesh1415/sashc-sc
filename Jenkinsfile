@@ -137,38 +137,38 @@ pipeline {
             }
         }
 
-stage('Performance Test (JMeter)') {
+        stage('Performance Test (JMeter)') {
             environment {
                 JMETER_VERSION = '5.6.3'
                 JMETER_HOME    = '/tmp/apache-jmeter-5.6.3'
             }
             steps {
-                echo 'Running Performance Tests inside the Python environment...'
+                echo 'Running Performance Tests inside Python environment...'
                 
                 script {
-                    // Jenkins automatically handles the workspace volume mounts flawlessly here
+                    // Jenkins automatically handles workspace mounting here
                     docker.image('python:3.12-slim').inside('-e HOME=/tmp') {
-                        
                         sh '''
-                            # 1. Set up the Django app
+                            # 1. Install missing system dependencies (curl and Java)
+                            echo "Installing curl and OpenJDK..."
+                            apt-get update -y && apt-get install -y curl openjdk-17-jre-headless
+
+                            # 2. Set up and start the Django app from the workspace code
                             cd backend
                             python -m pip install --user --no-cache-dir -r requirements.txt
                             python manage.py migrate --noinput
                             
-                            # 2. Launch the dev server in the background (using &)
                             echo "Starting Django server..."
                             python manage.py runserver 0.0.0.0:8000 > django_server.log 2>&1 &
                             
-                            # Give it a few seconds to initialize
+                            # Give Django a few seconds to wake up
                             sleep 5
-                            
-                            # 3. Head back to the root workspace directory
                             cd ..
 
-                            # 4. Clear old reports
+                            # 3. Clear old reports
                             rm -rf tests/jmeter-report tests/results.jtl
 
-                            # 5. Download Plugins Manager & CmdRunner if missing
+                            # 4. Download Plugins Manager & CmdRunner (now curl and java are available!)
                             if [ ! -f "${JMETER_HOME}/lib/ext/jmeter-plugins-manager.jar" ]; then
                                 echo "Installing JMeter Plugins Manager..."
                                 curl -sSL https://repo1.maven.org/maven2/kg/apc/jmeter-plugins-manager/1.9/jmeter-plugins-manager-1.9.jar -o "${JMETER_HOME}/lib/ext/jmeter-plugins-manager.jar"
@@ -176,7 +176,7 @@ stage('Performance Test (JMeter)') {
                                 java -cp "${JMETER_HOME}/lib/ext/jmeter-plugins-manager.jar" org.jmeterplugins.repository.PluginManagerCMDInstaller
                             fi
 
-                            # 6. Install jpgc-json plugin and wait for it to finish
+                            # 5. Install jpgc-json plugin and wait for completion
                             echo "Ensuring jpgc-json plugin is installed..."
                             "${JMETER_HOME}/bin/PluginsManagerCMD.sh" install jpgc-json
                             
@@ -184,7 +184,7 @@ stage('Performance Test (JMeter)') {
                                 sleep 1
                             done
 
-                            # 7. Run JMeter (Since it is in the same container, localhost:8000 works perfectly)
+                            # 6. Run JMeter load tests against localhost:8000
                             echo "Executing load tests..."
                             "${JMETER_HOME}/bin/jmeter" -n \
                               -t tests/sashc_test_plan.jmx \
@@ -216,7 +216,6 @@ stage('Performance Test (JMeter)') {
                 }
             }
         }
-
         stage('Docker Build') {
             steps {
                 echo 'Building Docker image (tagged latest + commit SHA)...'
