@@ -143,59 +143,67 @@ pipeline {
                 JMETER_HOME    = '/tmp/apache-jmeter-5.6.3'
             }
             steps {
-                echo 'Running Performance Tests inside Python environment...'
-                
-                script {
-                    // Jenkins automatically handles workspace mounting here
-                    docker.image('python:3.12-slim').inside('-e HOME=/tmp') {
-                        sh '''
-                            # 1. Install missing system dependencies (curl and Java)
-                            echo "Installing curl and OpenJDK..."
-                            apt-get update -y && apt-get install -y curl openjdk-17-jre-headless
+                echo 'Running JMeter performance tests inside a Python container...'
+                // The test plan logs in to obtain a JWT, so it needs valid
+                // credentials. Add a Jenkins "Username with password" credential
+                // 'jmeter-creds' where username = a seeded user's email and
+                // password = that user's password.
+                withCredentials([usernamePassword(
+                    credentialsId: 'jmeter-creds',
+                    usernameVariable: 'JMETER_EMAIL',
+                    passwordVariable: 'JMETER_PASS'
+                )]) {
+                    script {
+                        // Jenkins mounts the workspace into this container automatically.
+                        docker.image('python:3.12-slim').inside('-e HOME=/tmp') {
+                            sh '''
+                                set -e
 
-                            # 2. Set up and start the Django app from the workspace code
-                            cd backend
-                            python -m pip install --user --no-cache-dir -r requirements.txt
-                            python manage.py migrate --noinput
-                            
-                            echo "Starting Django server..."
-                            python manage.py runserver 0.0.0.0:8000 > django_server.log 2>&1 &
-                            
-                            # Give Django a few seconds to wake up
-                            sleep 5
-                            cd ..
+                                # 1. System deps: curl (downloads) + a JRE (runs JMeter).
+                                echo "Installing curl and OpenJDK..."
+                                apt-get update -y
+                                apt-get install -y --no-install-recommends curl openjdk-17-jre-headless
 
-                            # 3. Clear old reports
-                            rm -rf tests/jmeter-report tests/results.jtl
+                                # 2. Download & extract Apache JMeter itself. This step was
+                                #    missing before, so ${JMETER_HOME}/bin/jmeter never existed.
+                                if [ ! -x "${JMETER_HOME}/bin/jmeter" ]; then
+                                    echo "Downloading Apache JMeter ${JMETER_VERSION}..."
+                                    curl -sSL "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz" -o /tmp/jmeter.tgz
+                                    tar -xzf /tmp/jmeter.tgz -C /tmp
+                                fi
 
-                            # 4. Download Plugins Manager & CmdRunner (now curl and java are available!)
-                            if [ ! -f "${JMETER_HOME}/lib/ext/jmeter-plugins-manager.jar" ]; then
-                                echo "Installing JMeter Plugins Manager..."
-                                curl -sSL https://repo1.maven.org/maven2/kg/apc/jmeter-plugins-manager/1.9/jmeter-plugins-manager-1.9.jar -o "${JMETER_HOME}/lib/ext/jmeter-plugins-manager.jar"
-                                curl -sSL https://repo1.maven.org/maven2/kg/apc/cmdrunner/2.3/cmdrunner-2.3.jar -o "${JMETER_HOME}/lib/cmdrunner-2.3.jar"
-                                java -cp "${JMETER_HOME}/lib/ext/jmeter-plugins-manager.jar" org.jmeterplugins.repository.PluginManagerCMDInstaller
-                            fi
+                                # 3. Bring up the Django app under test from the workspace code.
+                                cd backend
+                                python -m pip install --user --no-cache-dir -r requirements.txt
+                                python manage.py migrate --noinput
+                                echo "Starting Django server..."
+                                python manage.py runserver 0.0.0.0:8000 > django_server.log 2>&1 &
+                                cd ..
 
-                            # 5. Install jpgc-json plugin and wait for completion
-                            echo "Ensuring jpgc-json plugin is installed..."
-                            "${JMETER_HOME}/bin/PluginsManagerCMD.sh" install jpgc-json
-                            
-                            while pgrep -f "PluginManagerCMD" > /dev/null; do
-                                sleep 1
-                            done
+                                # 4. Wait until Django actually answers before load-testing.
+                                echo "Waiting for Django to come up..."
+                                for i in $(seq 1 30); do
+                                    if curl -sf "http://127.0.0.1:8000/api/sashc/" >/dev/null 2>&1; then
+                                        echo "Django is up."
+                                        break
+                                    fi
+                                    sleep 2
+                                done
 
-                            # 6. Run JMeter load tests against localhost:8000
-                            echo "Executing load tests..."
-                            "${JMETER_HOME}/bin/jmeter" -n \
-                              -t tests/sashc_test_plan.jmx \
-                              -l tests/results.jtl \
-                              -e -o tests/jmeter-report \
-                              -Jhost=${JMETER_HOST} \
-                              -Jport=${JMETER_PORT} \
-                              -Jemail="${JMETER_EMAIL}" \
-                              -Jpassword="${JMETER_PASS}" \
-                              -Jyear=${JMETER_YEAR}
-                        '''
+                                # 5. Clear old reports and run the load test.
+                                rm -rf tests/jmeter-report tests/results.jtl
+                                echo "Executing load tests..."
+                                "${JMETER_HOME}/bin/jmeter" -n \
+                                  -t tests/sashc_test_plan.jmx \
+                                  -l tests/results.jtl \
+                                  -e -o tests/jmeter-report \
+                                  -Jhost="${JMETER_HOST}" \
+                                  -Jport="${JMETER_PORT}" \
+                                  -Jemail="${JMETER_EMAIL}" \
+                                  -Jpassword="${JMETER_PASS}" \
+                                  -Jyear="${JMETER_YEAR}"
+                            '''
+                        }
                     }
                 }
             }
@@ -216,6 +224,7 @@ pipeline {
                 }
             }
         }
+
         stage('Docker Build') {
             steps {
                 echo 'Building Docker image (tagged latest + commit SHA)...'
