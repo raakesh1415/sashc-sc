@@ -160,17 +160,22 @@ pipeline {
                                 set -e
 
                                 # 1. System deps: curl (downloads) + a JRE (runs JMeter).
-                                echo "Installing curl and OpenJDK..."
+                                #    Use default-jre-headless so this works whatever
+                                #    Debian release the python:3.12-slim base tracks
+                                #    (openjdk-17 doesn't exist on Debian 13/trixie).
+                                echo "Installing curl and a JRE..."
                                 apt-get update -y
-                                apt-get install -y --no-install-recommends curl openjdk-17-jre-headless
+                                apt-get install -y --no-install-recommends curl default-jre-headless
+                                java -version
 
                                 # 2. Download & extract Apache JMeter itself. This step was
                                 #    missing before, so ${JMETER_HOME}/bin/jmeter never existed.
                                 if [ ! -x "${JMETER_HOME}/bin/jmeter" ]; then
                                     echo "Downloading Apache JMeter ${JMETER_VERSION}..."
-                                    curl -sSL "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz" -o /tmp/jmeter.tgz
+                                    curl -fsSL "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz" -o /tmp/jmeter.tgz
                                     tar -xzf /tmp/jmeter.tgz -C /tmp
                                 fi
+                                "${JMETER_HOME}/bin/jmeter" --version
 
                                 # 3. Bring up the Django app under test from the workspace code.
                                 cd backend
@@ -181,14 +186,20 @@ pipeline {
                                 cd ..
 
                                 # 4. Wait until Django actually answers before load-testing.
+                                #    If it never comes up, dump its log and fail loudly.
                                 echo "Waiting for Django to come up..."
+                                UP=0
                                 for i in $(seq 1 30); do
                                     if curl -sf "http://127.0.0.1:8000/api/sashc/" >/dev/null 2>&1; then
-                                        echo "Django is up."
-                                        break
+                                        echo "Django is up."; UP=1; break
                                     fi
                                     sleep 2
                                 done
+                                if [ "$UP" != "1" ]; then
+                                    echo "ERROR: Django did not start. Server log:"
+                                    cat backend/django_server.log || true
+                                    exit 1
+                                fi
 
                                 # 5. Clear old reports and run the load test.
                                 rm -rf tests/jmeter-report tests/results.jtl
@@ -209,18 +220,28 @@ pipeline {
             }
             post {
                 always {
-                    publishHTML(target: [
-                        allowMissing: false,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'tests/jmeter-report',
-                        reportFiles: 'index.html',
-                        reportName: 'JMeter Performance Report'
-                    ])
+                    // Always archive the raw results + HTML report so they're
+                    // downloadable from the build even without extra plugins.
                     archiveArtifacts(
                         artifacts: 'tests/results.jtl, tests/jmeter-report/**',
                         allowEmptyArchive: true
                     )
+                    // publishHTML requires the "HTML Publisher" plugin. If it's
+                    // not installed, skip it instead of failing the build.
+                    script {
+                        try {
+                            publishHTML(target: [
+                                allowMissing: true,
+                                alwaysLinkToLastBuild: true,
+                                keepAll: true,
+                                reportDir: 'tests/jmeter-report',
+                                reportFiles: 'index.html',
+                                reportName: 'JMeter Performance Report'
+                            ])
+                        } catch (err) {
+                            echo "publishHTML skipped - install the 'HTML Publisher' plugin to view the report inline. (${err})"
+                        }
+                    }
                 }
             }
         }

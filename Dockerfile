@@ -20,6 +20,11 @@ RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 # .env and bakes the VITE_* vars into the bundle. Host node_modules /
 # dist are excluded via .dockerignore so they can't clobber this stage.
 COPY frontend/ ./
+
+# Serve the bundle under /static/ so Django + WhiteNoise can host it in the
+# single image. vite.config.js reads VITE_BASE (defaults to '/' elsewhere).
+ARG VITE_BASE=/static/
+ENV VITE_BASE=$VITE_BASE
 RUN npm run build
 
 # ---- Stage 2: Django backend ----
