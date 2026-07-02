@@ -259,3 +259,38 @@ LOGGING = {
         },
     },
 }
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Single-image SPA serving (Docker / Task A7)
+# When the compiled React app is baked into the image (the Dockerfile copies
+# frontend/dist -> /app/frontend_build), serve it through Django so ONE
+# container serves both the API and the SPA:
+#   * TEMPLATES DIRS   -> the catch-all TemplateView can render index.html
+#   * STATICFILES_DIRS -> collectstatic picks up the hashed JS/CSS assets
+#   * WhiteNoise        -> serves /static/ under Gunicorn (no runserver here)
+# The Docker build sets Vite base=/static/, so index.html references
+# /static/assets/*. This block is a no-op for local dev / Render because
+# frontend_build/ doesn't exist there, so it can't affect those setups.
+# ──────────────────────────────────────────────────────────────────────
+FRONTEND_BUILD_DIR = BASE_DIR / 'frontend_build'
+if FRONTEND_BUILD_DIR.is_dir():
+    TEMPLATES[0]['DIRS'].append(str(FRONTEND_BUILD_DIR))
+
+    STATICFILES_DIRS = [str(FRONTEND_BUILD_DIR)]
+
+    if 'whitenoise.middleware.WhiteNoiseMiddleware' not in MIDDLEWARE:
+        _sec = MIDDLEWARE.index('django.middleware.security.SecurityMiddleware')
+        MIDDLEWARE.insert(_sec + 1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+
+    STORAGES = {
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            # Compress but keep Vite's original hashed filenames. Do NOT use the
+            # Manifest storage here: it renames files and would break the
+            # hardcoded /static/assets/* references baked into index.html.
+            'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
+        },
+    }
