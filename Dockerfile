@@ -1,20 +1,24 @@
 # ──────────────────────────────────────────────────────────────
-# Single-image build (Task A7). Place this file at the REPO ROOT,
-# next to backend/ and frontend/.
-# React is compiled by Node, then served by Django via
-# Gunicorn + WhiteNoise — one image, one container.
+# Single-image build (Task A7). Lives at the REPO ROOT, next to
+# backend/ and frontend/.
+# React is compiled by Node, then Django serves the API (and the
+# baked static assets via WhiteNoise) under Gunicorn — one image,
+# one container.
 # ──────────────────────────────────────────────────────────────
 
 # ---- Stage 1: build the React frontend ----
 FROM node:20-alpine AS frontend
 WORKDIR /frontend
 
+# Install deps first for better layer caching. Use `npm ci` when a
+# lockfile is present (deterministic), else fall back to `npm install`.
 COPY frontend/package*.json ./
-RUN npm install
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-# COPY brings in frontend/.env (materialised from the Jenkins 'frontend-env'
-# secret at checkout). Vite auto-loads it and bakes the VITE_* vars into the
-# bundle at build time. This project uses Vite, which outputs to /frontend/dist.
+# COPY brings in the frontend source (and frontend/.env, materialised
+# from the Jenkins 'frontend-env' secret at checkout). Vite auto-loads
+# .env and bakes the VITE_* vars into the bundle. Host node_modules /
+# dist are excluded via .dockerignore so they can't clobber this stage.
 COPY frontend/ ./
 RUN npm run build
 
@@ -23,33 +27,36 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    # The folder next to settings.py that contains wsgi.py.
+    # The package next to settings.py that contains wsgi.py.
     # e.g. backend/sashc/wsgi.py  ->  "sashc.wsgi"
     DJANGO_WSGI_MODULE=sashc.wsgi
 
 WORKDIR /app
 
-# Build tools for psycopg2 (drop libpq-dev if you only use SQLite)
+# Build tools for psycopg2 / scientific wheels. libpq-dev is needed by
+# psycopg2-binary's build path; the rest cover numpy/scipy/scikit-learn.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Python dependencies. gunicorn + whitenoise are added here so they
-# don't have to be in requirements.txt.
+# Python dependencies. gunicorn + whitenoise are already pinned in
+# requirements.txt, so a plain install is enough.
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt gunicorn whitenoise
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Django source code
+# Django source code (includes backend/.env when Jenkins materialises it).
 COPY backend/ ./
 
-# Bring the compiled React app in so collectstatic / WhiteNoise serve it.
-# Vite outputs to dist/.
+# Bring the compiled React app in. Vite outputs to dist/.
 COPY --from=frontend /frontend/dist ./frontend_build
 
-# Application port (Task A7). Gunicorn binds to 8000 below.
+# Entrypoint: collectstatic -> migrate (if DB set) -> gunicorn.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+# Strip any CRLF (repo is edited on Windows) so the shebang works, then chmod.
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Application port (Task A7). Gunicorn binds to 8000.
 EXPOSE 8000
 
-# Start command: apply migrations -> collect static files -> run Gunicorn.
-CMD python manage.py migrate --noinput && \
-    python manage.py collectstatic --noinput && \
-    gunicorn ${DJANGO_WSGI_MODULE}:application --bind 0.0.0.0:8000 --workers 3
+ENTRYPOINT ["docker-entrypoint.sh"]

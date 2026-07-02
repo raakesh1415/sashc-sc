@@ -1,0 +1,35 @@
+# ── Build context hygiene ─────────────────────────────────────────────
+# Keeps the image small and, critically, prevents the host's node_modules
+# (Windows binaries) from clobbering the Linux node_modules installed
+# inside the frontend build stage.
+
+# Node
+**/node_modules
+frontend/dist
+
+# Python
+**/__pycache__
+**/*.py[cod]
+backend/staticfiles
+backend/media
+backend/logs
+**/.venv
+**/venv
+
+# Git / editor / CI
+.git
+.gitignore
+.vscode
+Jenkinsfile
+tests
+
+# Local junk
+aa
+aaaa
+desktop.ini
+**/desktop.ini
+*.md
+
+# NOTE: .env files are intentionally NOT ignored — Jenkins materialises
+# backend/.env and frontend/.env into the workspace before the build so
+# they can be baked in / read at runtime.
