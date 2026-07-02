@@ -144,17 +144,16 @@ pipeline {
             }
             steps {
                 echo 'Running JMeter performance tests inside a Python container...'
-                // The test plan logs in to obtain a JWT, so it needs valid
-                // credentials. Add a Jenkins "Username with password" credential
-                // 'jmeter-creds' where username = a seeded user's email and
-                // password = that user's password.
-                withCredentials([usernamePassword(
-                    credentialsId: 'jmeter-creds',
-                    usernameVariable: 'JMETER_EMAIL',
-                    passwordVariable: 'JMETER_PASS'
-                )]) {
-                    script {
-                        // Jenkins mounts the workspace into this container automatically.
+                // The test plan logs in to obtain a JWT using the OPTIONAL Jenkins
+                // credential 'jmeter-creds' (Username with password: username = a
+                // seeded user's email, password = their password). If it isn't set
+                // up, the stage falls back to the default login in the .jmx so it
+                // still runs.
+                script {
+                    // Jenkins mounts the workspace into this container automatically.
+                    def started = false
+                    def runJmeter = {
+                        started = true
                         docker.image('python:3.12-slim').inside('-e HOME=/tmp') {
                             sh '''
                                 set -e
@@ -204,17 +203,34 @@ pipeline {
                                 # 5. Clear old reports and run the load test.
                                 rm -rf tests/jmeter-report tests/results.jtl
                                 echo "Executing load tests..."
+                                # Only pass -Jemail/-Jpassword when provided; otherwise
+                                # the .jmx defaults (admin@example.com / changeme) apply.
+                                CRED_ARGS=""
+                                if [ -n "${JMETER_EMAIL:-}" ]; then CRED_ARGS="$CRED_ARGS -Jemail=${JMETER_EMAIL}"; fi
+                                if [ -n "${JMETER_PASS:-}" ];  then CRED_ARGS="$CRED_ARGS -Jpassword=${JMETER_PASS}"; fi
                                 "${JMETER_HOME}/bin/jmeter" -n \
                                   -t tests/sashc_test_plan.jmx \
                                   -l tests/results.jtl \
                                   -e -o tests/jmeter-report \
                                   -Jhost="${JMETER_HOST}" \
                                   -Jport="${JMETER_PORT}" \
-                                  -Jemail="${JMETER_EMAIL}" \
-                                  -Jpassword="${JMETER_PASS}" \
-                                  -Jyear="${JMETER_YEAR}"
+                                  -Jyear="${JMETER_YEAR}" \
+                                  ${CRED_ARGS}
                             '''
                         }
+                    }
+                    try {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'jmeter-creds',
+                            usernameVariable: 'JMETER_EMAIL',
+                            passwordVariable: 'JMETER_PASS'
+                        )]) {
+                            runJmeter()
+                        }
+                    } catch (err) {
+                        if (started) { throw err }
+                        echo "WARNING: 'jmeter-creds' credential not found - running with the default login from the .jmx (admin@example.com / changeme). Add a 'Username with password' credential named 'jmeter-creds' for a real login."
+                        runJmeter()
                     }
                 }
             }
