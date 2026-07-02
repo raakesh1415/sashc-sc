@@ -25,6 +25,17 @@ COPY frontend/ ./
 # single image. vite.config.js reads VITE_BASE (defaults to '/' elsewhere).
 ARG VITE_BASE=/static/
 ENV VITE_BASE=$VITE_BASE
+
+# Where the SPA sends its API calls (baked into the bundle at build time).
+# Default '/api/sashc' = this container's OWN Django (same origin), which in
+# turn talks to Neon via DATABASE_URL at runtime. Override for a remote API:
+#   docker build --build-arg VITE_BACKEND_BASE_URL=https://host/api/sashc .
+# Written to .env.production.local - Vite's highest-priority env file for
+# `vite build` - so it wins over any frontend/.env the Jenkins 'frontend-env'
+# credential supplies. The single image's SPA always calls its own Django.
+ARG VITE_BACKEND_BASE_URL=/api/sashc
+RUN echo "VITE_BACKEND_BASE_URL=${VITE_BACKEND_BASE_URL}" > .env.production.local
+
 RUN npm run build
 
 # ---- Stage 2: Django backend ----

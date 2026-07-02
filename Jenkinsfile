@@ -273,8 +273,12 @@ pipeline {
         stage('Docker Build') {
             steps {
                 echo 'Building Docker image (tagged latest + commit SHA)...'
+                // VITE_BACKEND_BASE_URL=/api/sashc makes the baked SPA call this
+                // image's own Django (same origin), which reaches Neon via the
+                // backend/.env DATABASE_URL baked in during the build.
                 sh '''
                     docker build \
+                      --build-arg VITE_BACKEND_BASE_URL=/api/sashc \
                       -t ${DOCKER_IMAGE}:latest \
                       -t ${DOCKER_IMAGE}:${GIT_SHA} .
                 '''
