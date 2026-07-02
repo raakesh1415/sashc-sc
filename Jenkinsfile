@@ -209,18 +209,28 @@ pipeline {
             }
             post {
                 always {
-                    publishHTML(target: [
-                        allowMissing: false,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'tests/jmeter-report',
-                        reportFiles: 'index.html',
-                        reportName: 'JMeter Performance Report'
-                    ])
+                    // Always archive the raw results + HTML report so they're
+                    // downloadable from the build even without extra plugins.
                     archiveArtifacts(
                         artifacts: 'tests/results.jtl, tests/jmeter-report/**',
                         allowEmptyArchive: true
                     )
+                    // publishHTML requires the "HTML Publisher" plugin. If it's
+                    // not installed, skip it instead of failing the build.
+                    script {
+                        try {
+                            publishHTML(target: [
+                                allowMissing: true,
+                                alwaysLinkToLastBuild: true,
+                                keepAll: true,
+                                reportDir: 'tests/jmeter-report',
+                                reportFiles: 'index.html',
+                                reportName: 'JMeter Performance Report'
+                            ])
+                        } catch (err) {
+                            echo "publishHTML skipped - install the 'HTML Publisher' plugin to view the report inline. (${err})"
+                        }
+                    }
                 }
             }
         }
