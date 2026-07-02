@@ -154,7 +154,10 @@ pipeline {
                     def started = false
                     def runJmeter = {
                         started = true
-                        docker.image('python:3.12-slim').inside('-e HOME=/tmp') {
+                        // Run as root (-u 0:0) so apt-get can install curl + a JRE;
+                        // by default Jenkins runs .inside() as the agent user (uid
+                        // 1000), which can't apt-get. We chown outputs back below.
+                        docker.image('python:3.12-slim').inside('-u 0:0 -e HOME=/tmp') {
                             sh '''
                                 set -e
 
@@ -216,6 +219,11 @@ pipeline {
                                   -Jport="${JMETER_PORT}" \
                                   -Jyear="${JMETER_YEAR}" \
                                   ${CRED_ARGS}
+
+                                # We ran as root, so the report/results are root-owned.
+                                # Hand them back to the Jenkins agent user (uid 1000)
+                                # so later builds can clean the workspace.
+                                chown -R 1000:1000 tests backend/django_server.log 2>/dev/null || true
                             '''
                         }
                     }
